@@ -1,10 +1,13 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 import json
 from flask_cors import CORS
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
+from openpyxl import Workbook
+from io import BytesIO
+
 
 load_dotenv()
 
@@ -155,6 +158,201 @@ def submit_data():
         if conn:
             cursor.close()
             conn.close()
+
+
+@app.route("/api/export_employees")
+def export_employees():
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    # Obtener todas las sedes únicas
+    cursor.execute("SELECT DISTINCT nombre FROM sedes")
+    sedes = [row["nombre"] for row in cursor.fetchall()]
+
+    # Lista de encabezados
+    headers = [
+        "Nombre Responsable",
+        "Telefono Responsable",
+        "Sede",
+        "Cedula del Funcionario",
+        "Nombre del Funcionario",
+        "Edad del Funcionario",
+        "Sexo del Funcionario",
+        "Teléfono del Funcionario",
+        "Cargo",
+        "Tipo de Trabajador",
+        "Tipo de Personal",
+        "Adscripción Nominal",
+        "Ubicación Física",
+        "Funciones",
+        "Posee carnet",
+        "Estado Civil",
+        "Nivel Académico",
+        "Titulo Obtenido en Educación Superior",
+        "Talla de Camisa",
+        "Talla de Traje",
+        "Talla de Zapatos",
+        "Cantidad de Cargas Familiares",
+        "Cantidad de Beneficiarios Inscritos en FASDEM",
+        "Cantidad de Hijos",
+        "Instagram",
+        "TikTok",
+        "Facebook",
+    ]
+
+    workbook = Workbook()
+
+    for sede in sedes:
+        # Crear una nueva hoja con el nombre de la sede
+        sheet = workbook.create_sheet(
+            title=sede[:31]
+        )  # El nombre de una hoja no puede superar 31 caracteres
+
+        # Escribir los encabezados en la fila 1
+        for col_num, header in enumerate(headers, start=1):
+            sheet.cell(row=1, column=col_num, value=header)
+
+        # Ejecutar la consulta para la sede actual
+        cursor.execute(
+            """
+            SELECT 
+                responsables.name AS nombre_responsable,
+                responsables.phone AS telefono_responsable,
+                sedes.nombre AS sede,
+                func.funcionario_id,
+                func.name as nombre_funcionario,
+                func.age,
+                func.gender,
+                func.phone,
+                func.cargo,
+                func.tipo_trabajador,
+                func.tipo_personal,
+                func.adscripcion_nominal,
+                func.ubicacion_fisica,
+                func.funciones,
+                func.tiene_carnet,
+                func.estado_civil,
+                func.nivel_academico,
+                func.titulo_educacion_superior,
+                func.shirt_size,
+                func.suit_size,
+                func.shoe_size,
+                func.num_carga_familiar,
+                func.num_fasdem_beneficiarios,
+                func.instagram,
+                func.tiktok,
+                func.facebook,
+                COUNT(hijos.id) AS num_hijos
+            FROM funcionarios AS func
+            INNER JOIN sedes
+                ON sedes.id = func.sede_id
+            INNER JOIN responsables
+                ON responsables.id = func.responsable_id
+            LEFT JOIN hijos
+                ON hijos.funcionario_id = func.id
+            WHERE sedes.nombre = %s
+            GROUP BY 
+                responsables.name,
+                responsables.phone,
+                sedes.nombre,
+                func.funcionario_id,
+                func.name,
+                func.age,
+                func.gender,
+                func.phone,
+                func.cargo,
+                func.tipo_trabajador,
+                func.tipo_personal,
+                func.adscripcion_nominal,
+                func.ubicacion_fisica,
+                func.funciones,
+                func.tiene_carnet,
+                func.estado_civil,
+                func.nivel_academico,
+                func.titulo_educacion_superior,
+                func.shirt_size,
+                func.suit_size,
+                func.shoe_size,
+                func.num_carga_familiar,
+                func.num_fasdem_beneficiarios,
+                func.instagram,
+                func.tiktok,
+                func.facebook
+            """,
+            (sede,),
+        )
+        raw_data = cursor.fetchall()
+
+        # Agregar los datos de la sede actual
+        for data in raw_data:
+            sheet.append(
+                [
+                    data["nombre_responsable"],
+                    data["telefono_responsable"],
+                    data["sede"],
+                    data["funcionario_id"],
+                    data["nombre_funcionario"],
+                    data["age"],
+                    data["gender"],
+                    data["phone"],
+                    data["cargo"],
+                    data["tipo_trabajador"],
+                    data["tipo_personal"],
+                    data["adscripcion_nominal"],
+                    data["ubicacion_fisica"],
+                    data["funciones"],
+                    "Si" if data["tiene_carnet"] else "No",
+                    data["estado_civil"],
+                    data["nivel_academico"],
+                    "Ninguno"
+                    if len(data["titulo_educacion_superior"]) < 1
+                    else data["titulo_educacion_superior"],
+                    data["shirt_size"],
+                    data["suit_size"],
+                    data["shoe_size"],
+                    data["num_carga_familiar"],
+                    data["num_fasdem_beneficiarios"],
+                    data["num_hijos"],
+                    data["instagram"],
+                    data["tiktok"],
+                    data["facebook"],
+                ]
+            )
+
+        # Ajustar el ancho de las columnas automáticamente
+        for column_cells in sheet.columns:
+            max_length = 0
+            column_letter = column_cells[
+                0
+            ].column_letter  # Obtiene la letra de la columna
+            for cell in column_cells:
+                try:
+                    # Obtener la longitud del contenido de cada celda
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            adjusted_width = max_length + 2  # Ajuste extra para mayor claridad
+            sheet.column_dimensions[column_letter].width = adjusted_width
+
+    # Eliminar la hoja predeterminada si no se usa
+    if "Sheet" in workbook.sheetnames:
+        del workbook["Sheet"]
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+
+    # Cerrar conexión
+    cursor.close()
+    conn.close()
+
+    # Devolver el archivo como respuesta HTTP
+    return Response(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=puesto_a_puesto.xlsx"},
+    )
 
 
 if __name__ == "__main__":
