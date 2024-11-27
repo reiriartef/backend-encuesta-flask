@@ -354,6 +354,88 @@ def export_employees():
         headers={"Content-Disposition": "attachment; filename=puesto_a_puesto.xlsx"},
     )
 
+@app.route("/api/sedes")
+def devolver_sedes():
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    # Obtener todas las sedes únicas
+    cursor.execute("SELECT DISTINCT * FROM sedes")
+    sedes = cursor.fetchall()
+    return sedes
+
+@app.route("/api/funcionarios")
+def devolver_funcionarios():
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    # Obtener todas las sedes únicas
+    cursor.execute("""
+    SELECT 
+                responsables.name AS nombre_responsable,
+                responsables.phone AS telefono_responsable,
+                sedes.nombre AS sede,
+                func.funcionario_id,
+                func.name as nombre_funcionario,
+                func.age,
+                func.gender,
+                func.phone,
+                func.cargo,
+                func.tipo_trabajador,
+                func.tipo_personal,
+                func.adscripcion_nominal,
+                func.ubicacion_fisica,
+                func.funciones,
+                func.tiene_carnet,
+                func.estado_civil,
+                func.nivel_academico,
+                func.titulo_educacion_superior,
+                func.shirt_size,
+                func.suit_size,
+                func.shoe_size,
+                func.num_carga_familiar,
+                func.num_fasdem_beneficiarios,
+                func.instagram,
+                func.tiktok,
+                func.facebook,
+                COUNT(hijos.id) AS num_hijos
+            FROM funcionarios AS func
+            INNER JOIN sedes
+                ON sedes.id = func.sede_id
+            INNER JOIN responsables
+                ON responsables.id = func.responsable_id
+            LEFT JOIN hijos
+                ON hijos.funcionario_id = func.id
+            GROUP BY 
+                responsables.name,
+                responsables.phone,
+                sedes.nombre,
+                func.funcionario_id,
+                func.name,
+                func.age,
+                func.gender,
+                func.phone,
+                func.cargo,
+                func.tipo_trabajador,
+                func.tipo_personal,
+                func.adscripcion_nominal,
+                func.ubicacion_fisica,
+                func.funciones,
+                func.tiene_carnet,
+                func.estado_civil,
+                func.nivel_academico,
+                func.titulo_educacion_superior,
+                func.shirt_size,
+                func.suit_size,
+                func.shoe_size,
+                func.num_carga_familiar,
+                func.num_fasdem_beneficiarios,
+                func.instagram,
+                func.tiktok,
+                func.facebook
+""")
+    funcionarios = cursor.fetchall()
+    return funcionarios
 
 if __name__ == "__main__":
     app.run(debug=True)
