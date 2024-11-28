@@ -136,12 +136,13 @@ def submit_data():
 
         for hijo in hijos:
             cursor.execute(
-                "INSERT INTO hijos (funcionario_id, nombre, edad, patologias) VALUES (%s,%s,%s,%s)",
+                "INSERT INTO hijos (funcionario_id, nombre, edad, patologias, sexo) VALUES (%s,%s,%s,%s, %s)",
                 [
                     funcionario_id,
                     hijo.get("nombre"),
                     hijo.get("edad"),
                     hijo.get("patologias"),
+                    hijo.get("sexo"),
                 ],
             )
 
