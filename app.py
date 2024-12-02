@@ -438,5 +438,71 @@ def devolver_funcionarios():
     funcionarios = cursor.fetchall()
     return funcionarios
 
+@app.route("/api/hijos", methods=['GET'])
+def devolver_hijos_funcionario():
+    funcionario_id = request.args.get("funcionario")
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    # Obtener todas las sedes únicas
+    cursor.execute(""" 
+                   SELECT
+                   hijos.nombre,
+                   hijos.edad,
+                   hijos.sexo,
+                   hijos.patologias
+                   FROM
+                   hijos
+                   INNER JOIN
+                   funcionarios
+                   ON funcionarios.id = hijos.funcionario_id
+                   WHERE
+                   funcionarios.funcionario_id = %s  """, [funcionario_id])
+    hijos = cursor.fetchall()
+    return hijos
+
+@app.route("/api/cargas", methods=['GET'])
+def devolver_cargas_funcionario():
+    funcionario_id = request.args.get("funcionario")
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    # Obtener todas las sedes únicas
+    cursor.execute(""" 
+                   SELECT
+                   carga_familiar.nombre,
+                   carga_familiar.edad,
+                   carga_familiar.patologias
+                   FROM
+                   carga_familiar
+                   INNER JOIN
+                   funcionarios
+                   ON funcionarios.id = carga_familiar.funcionario_id
+                   WHERE
+                   funcionarios.funcionario_id = %s  """, [funcionario_id])
+    cargas = cursor.fetchall()
+    return cargas
+
+@app.route("/api/beneficiarios", methods=['GET'])
+def devolver_beneficiarios_funcionario():
+    funcionario_id = request.args.get("funcionario")
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    # Obtener todas las sedes únicas
+    cursor.execute(""" 
+                   SELECT
+                   beneficiarios_fasdem.nombre,
+                   beneficiarios_fasdem.edad,
+                   beneficiarios_fasdem.patologias
+                   FROM
+                   beneficiarios_fasdem
+                   INNER JOIN
+                   funcionarios
+                   ON funcionarios.id = beneficiarios_fasdem.funcionario_id
+                   WHERE
+                   funcionarios.funcionario_id = %s  """, [funcionario_id])
+    beneficiarios = cursor.fetchall()
+    return beneficiarios
 if __name__ == "__main__":
     app.run(debug=True)
